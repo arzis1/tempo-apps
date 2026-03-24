@@ -46,7 +46,7 @@ function SetAsFeeTokenInner(
 	const connectors = useConnectors()
 	const connect = useConnect()
 	const switchChain = useSwitchChain()
-	const setFeeToken = Hooks.fee.useSetUserTokenSync()
+	const setFeeToken = Hooks.fee.useSetUserToken()
 	const userToken = Hooks.fee.useUserToken({ account })
 
 	const [showSuccess, setShowSuccess] = React.useState(false)
