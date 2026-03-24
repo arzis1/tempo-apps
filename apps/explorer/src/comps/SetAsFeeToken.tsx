@@ -1,18 +1,17 @@
 import { ClientOnly } from '@tanstack/react-router'
+import type { Address } from 'ox'
 import * as React from 'react'
-import { Hooks } from 'wagmi/tempo'
 import {
-	useChains,
 	useConnect,
 	useConnection,
 	useConnectors,
 	useSwitchChain,
 } from 'wagmi'
+import { Hooks } from 'wagmi/tempo'
 import { cx } from '#lib/css'
-import { filterSupportedInjectedConnectors } from '#lib/wallets.ts'
-import { getTempoChain } from '#wagmi.config.ts'
-import { Button } from '#comps/ConnectWallet'
-import type { Address } from 'ox'
+import { filterSupportedInjectedConnectors } from '#lib/wallets'
+import { getTempoChain } from '#wagmi.config'
+import LucideCoins from '~icons/lucide/coins'
 
 const TEMPO_CHAIN_ID = getTempoChain().id
 
@@ -31,13 +30,21 @@ export declare namespace SetAsFeeToken {
 	}
 }
 
-function SetAsFeeTokenInner(props: SetAsFeeToken.Props): React.JSX.Element {
-	const { address: tokenAddress, symbol } = props
+function getWalletName(
+	connector: { name?: string; id?: string } | undefined | null,
+): string | undefined {
+	if (!connector) return undefined
+	if (connector.name && connector.name !== 'Injected') return connector.name
+	return undefined
+}
 
-	const connect = useConnect()
+function SetAsFeeTokenInner(
+	props: SetAsFeeToken.Props,
+): React.JSX.Element | null {
+	const { address: tokenAddress, symbol } = props
+	const { address: account, connector, chain } = useConnection()
 	const connectors = useConnectors()
-	const { address: account, chain, connector } = useConnection()
-	const chains = useChains()
+	const connect = useConnect()
 	const switchChain = useSwitchChain()
 	const setFeeToken = Hooks.fee.useSetUserTokenSync()
 	const userToken = Hooks.fee.useUserToken({ account })
@@ -50,23 +57,27 @@ function SetAsFeeTokenInner(props: SetAsFeeToken.Props): React.JSX.Element {
 	)
 
 	const isConnected = !!account
-	const isOnTempoChain = chains.some((c) => c.id === chain?.id)
-	const walletName = connector?.name ?? 'Wallet'
+	const isOnTempoChain = chain?.id === TEMPO_CHAIN_ID
 	const isAlreadyFeeToken =
 		userToken.data?.address?.toLowerCase() === tokenAddress.toLowerCase()
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reset state when navigating to a different token
+	React.useEffect(() => {
+		setShowSuccess(false)
+	}, [tokenAddress])
+
 	React.useEffect(() => {
 		if (!showSuccess) return
-		const timer = setTimeout(() => setShowSuccess(false), 3_000)
-		return () => clearTimeout(timer)
+		const timeout = setTimeout(() => setShowSuccess(false), 3_000)
+		return () => clearTimeout(timeout)
 	}, [showSuccess])
-
-	if (supportedConnectors.length === 0) return <></>
 
 	const handleClick = () => {
 		if (!isConnected) {
 			const primaryConnector = supportedConnectors[0]
-			if (primaryConnector) connect.mutate({ connector: primaryConnector })
+			if (primaryConnector) {
+				connect.mutate({ connector: primaryConnector })
+			}
 			return
 		}
 
@@ -87,30 +98,55 @@ function SetAsFeeTokenInner(props: SetAsFeeToken.Props): React.JSX.Element {
 		)
 	}
 
-	const isPending =
-		connect.isPending || switchChain.isPending || setFeeToken.isPending
+	const walletName =
+		getWalletName(connector) ??
+		getWalletName(supportedConnectors[0]) ??
+		'Wallet'
 
-	const label = (() => {
-		if (showSuccess) return 'Fee token set!'
-		if (isAlreadyFeeToken) return 'Already your fee token ✓'
-		if (!isConnected) return `Connect ${walletName}`
-		if (!isOnTempoChain) return 'Switch to Tempo'
-		if (setFeeToken.isPending) return 'Setting…'
-		return `Set ${symbol ?? 'token'} as fee token`
-	})()
+	const busy =
+		connect.isPending ||
+		switchChain.isPending ||
+		setFeeToken.isPending ||
+		showSuccess
+
+	const needsChainSwitch = isConnected && !isOnTempoChain
+
+	const label = showSuccess
+		? 'Fee token set!'
+		: isAlreadyFeeToken
+			? 'Already your fee token'
+			: setFeeToken.isPending
+				? 'Setting…'
+				: switchChain.isPending
+					? 'Switching network…'
+					: connect.isPending
+						? 'Connecting…'
+						: needsChainSwitch
+							? 'Switch to Tempo'
+							: isConnected
+								? `Set ${symbol ?? 'token'} as fee token`
+								: `Connect ${walletName}`
+
+	if (supportedConnectors.length === 0) return null
 
 	return (
-		<Button
+		<button
 			type="button"
-			variant="default"
-			onClick={handleClick}
-			disabled={isPending || isAlreadyFeeToken}
+			disabled={busy || isAlreadyFeeToken}
 			className={cx(
-				'rounded-[8px] bg-base-plane-interactive px-[10px] py-[6px] text-primary border border-base-border hover:bg-base-plane hover:no-underline transition-colors justify-center',
-				isPending && 'animate-pulse',
+				'flex items-center justify-center gap-2 w-full rounded-lg border px-3 py-2 text-[13px] font-sans font-medium cursor-pointer press-down transition-colors',
+				showSuccess
+					? 'border-positive/30 text-positive bg-positive/5'
+					: isAlreadyFeeToken
+						? 'border-base-border text-tertiary bg-base-plane'
+						: busy
+							? 'border-base-border text-secondary bg-base-plane animate-pulse'
+							: 'border-base-border text-secondary bg-base-plane hover:bg-base-plane-interactive hover:text-primary',
 			)}
+			onClick={handleClick}
 		>
+			<LucideCoins className="size-3.5" />
 			{label}
-		</Button>
+		</button>
 	)
 }
