@@ -19,6 +19,7 @@ import * as z from 'zod/mini'
 import { Amount } from '#comps/Amount'
 import { AccountCard } from '#comps/AccountCard'
 import { AddToWallet } from '#comps/AddToWallet'
+import { SetAsFeeToken } from '#comps/SetAsFeeToken'
 import { AddressCell } from '#comps/AddressCell'
 import { AmountCell, BalanceCell } from '#comps/AmountCell'
 import { BreadcrumbsSlot } from '#comps/Breadcrumbs'
@@ -769,7 +770,6 @@ function AccountCardWithTimestamps(props: {
 		<div className="self-start flex flex-col gap-2">
 			<AccountCard
 				address={address}
-				className="self-start"
 				createdTimestamp={createdTimestamp}
 				lastActivityTimestamp={
 					addressMetadata?.lastActivityTimestamp
@@ -783,11 +783,14 @@ function AccountCardWithTimestamps(props: {
 				tokenName={tokenMetadata?.name}
 			/>
 			{isToken && (
-				<AddToWallet
-					address={address}
-					symbol={tokenMetadata?.symbol}
-					decimals={tokenMetadata?.decimals}
-				/>
+				<>
+					<AddToWallet
+						address={address}
+						symbol={tokenMetadata?.symbol}
+						decimals={tokenMetadata?.decimals}
+					/>
+					<SetAsFeeToken address={address} symbol={tokenMetadata?.symbol} />
+				</>
 			)}
 		</div>
 	)
